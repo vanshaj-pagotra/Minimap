@@ -5,10 +5,10 @@ import argparse
 import time
 
 HEADER = 1024                                           # No. of bytes of data to receive from Target
-num_threads = 100                                       # Maximum number of active threads
+num_threads = 150                                       # Maximum number of active threads
 
 port_queue = queue.Queue()
-print_lock = threading.Lock()                           # Locks the print function so that two threads don't try to print at the same time
+print_lock = threading.Lock()                           # For thread safe printing
 
 # Port Scanner
 def scan(host):
@@ -19,7 +19,7 @@ def scan(host):
             break
 
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)   # Creates a socket object
-        s.settimeout(2)                                         # Sets the Socket to timeout after 2 seconds
+        s.settimeout(2)                                         # Sets the Socket to timeout after 5 seconds
         try:
             result = s.connect_ex((host, port))                 # Returns 0 if connection is successful
             if result == 0:
@@ -30,6 +30,9 @@ def scan(host):
         except socket.error:
             with print_lock:
                 print("Socket: Connection error")
+        except Exception as e:
+            with print_lock:
+                print(f"Error: {e}")
         finally:
             s.close()                                           # Closes the socket
             port_queue.task_done()                              # Tells the Queue that Task was completed
@@ -38,19 +41,51 @@ def scan(host):
 
 # Banner Grabber
 def banner_grab(s, port):
+
+    msg = None
+
+    # Send a specific protocol request based on common services running on specified port
+    if port == 21: msg = b"HELP\r\n"; service = "FTP"
+    elif port == 22: service = "SSH"
+    elif port == 23: msg = b"\r\n"; service = "TELNET"
+    elif port == 25: msg = b"HELO example.com\r\n"; service = "SMTP"
+    elif port == 80 or port == 8080: msg = b"HEAD / HTTP/1.0\r\n\r\n"; service = "HTTP"
+    elif port == 110: msg = b"USER test\r\n"; service = "POP3"
+    elif port == 143: msg = b"a1 CAPABILITY\r\n"; service = "IMAP"
+    elif port == 443: service = "HTTPS"
+    elif port == 3306: service = "MySQL"
+    else: service = "Unknown Service"
+
+    # Banner Grabbing Logic
     try:
-        banner = s.recv(HEADER).decode().strip()                # Receives 1024 bytes from the Target after connecting
-        with print_lock:
-            print(f"Port {port} is open")
-            print(f"Port: {port}  Service: {banner}")
+        if msg:
+            s.sendall(msg)                                          # Sends protocol request
+        banner = s.recv(HEADER).decode().strip()                    # Receives 1024 bytes from the Target after connecting
+
+        lines = banner.splitlines()                                 # Splits the banner into lines
+        if len(lines)<3:                                            # If the number of lines in banner is less than 3
+            with print_lock:                                        # then prints the first line
+                print(f"\nPort {port} is open")
+                print(f"Service: [{service}]  \nBanner:\n{lines[0]}")
+        else:                                                       # Otherwise prints first three lines
+            with print_lock:
+                print(f"\nPort {port} is open")
+                print(f"Service: [{service}]  \nBanner:\n{lines[0]}\n{lines[1]}\n{lines[2]}")
     except socket.timeout:
         with print_lock:
-            print(f"Port {port} is open")
-            print(f"Banner: Port {port} timed out")
+            print(f"\nPort {port} is open")
+            print(f"    Service: {service}  Banner: Banner Grabbing failed")
     except socket.error as e:
         with print_lock:
-            print(f"Port {port} is open")
-            print(f"Banner not found on port {port}: {e}")
+            print(f"\nPort {port} is open")
+            print(f"    Service: {service}  Banner: Banner not found on port {port}: {e}")
+    except ValueError:
+        with print_lock:
+            print("\nPort {port} is open")
+            print("Unable to retrieve banner; Please try again.")
+    except Exception as e:
+        with print_lock:
+            print(f"Error: {e}")
 
 
 
@@ -91,7 +126,8 @@ def main():
         exit(1)
 
     # Puts ports into the queue
-    print("port_scanner started...")
+    print("\nMinimap started...")
+    print(f"Scanning {host}")
     for port in range(lower, upper + 1):
         port_queue.put(port)
 
@@ -122,4 +158,4 @@ if __name__ == "__main__":
         exit(1)
     port_queue.join()
     duration = time.time() - start
-    print(f"Scan Completed in {duration:.2f} seconds")
+    print(f"\nScan Completed in {duration:.2f} seconds\n")
