@@ -5,11 +5,11 @@
 
 
 ## Features
-- Scan single ports or port ranges.
+- Scan any IP address for a specified port or port range.
 
 - Multithreaded scanning for improved speed.
 
-- Banner grabbing for service identification.
+- Grabs service banner using specific protocol requests.
 
 - Thread-safe console output.
 
@@ -31,7 +31,7 @@ python minimap.py -H <target_host> -P <port_range>
 - Only use the `-H` flag
 
 ```cmd
-python port_scanner.py -H scanme.nmap.org
+python minimap.py -H example.com
 ```
 
 ### Scan a specific range:
@@ -39,7 +39,7 @@ python port_scanner.py -H scanme.nmap.org
 - Use `-P` flag
 - Put `-` between the lower and upper limit of the range
 ```cmd
-python port_scanner.py -H 192.168.1.1 -P 20-100
+python minimap.py -H exapmle.com -P 20-100
 ```
 
 ### Scan a single port:
@@ -50,13 +50,31 @@ python port_scanner.py -H example.com -P 443
 ```
 
 ## How It Works
-- Ports to scan are added to a queue.
+- Ports are added to a queue.
 
-- Worker threads pull ports from the queue and attempt to connect.
+- Threads pull ports from the queue and attempt to connect.
+
+- Open ports are identified.
 
 - Successful connections are checked for banner information.
 
-- Results are printed to the console.
+- Results are displayed to the terminal.
+
+
+
+```markdown
+## Sample Output
+
+Minimap started...
+Scanning 45.33.32.156
+
+Port 22 is open
+Service: [SSH]  
+Banner:
+SSH-2.0-OpenSSH_6.6.1p1 Ubuntu-2ubuntu2.13
+
+Scan Completed in 0.67 seconds
+```
 
 ## Requirements
 
@@ -64,7 +82,5 @@ python port_scanner.py -H example.com -P 443
 
 No external dependencies are required.
 
-## Notes
-- The scanner uses 100 threads by default for faster scanning.
-
-- Only include scanning targets or ports you have permission to test.
+## Disclaimer
+**Only scan targets or ports you have permission to test.**
